@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ControleTI - Pedidos</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;display:flex;min-height:100vh}
+.sidebar{width:240px;background:#1e293b;padding:20px;display:flex;flex-direction:column;gap:8px;position:fixed;height:100vh;overflow-y:auto}
+.sidebar-logo{font-size:20px;font-weight:700;color:#3b82f6;padding:10px 0 20px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#94a3b8;text-decoration:none;font-size:14px;transition:.2s}
+.nav-item:hover,.nav-item.active{background:#334155;color:#e2e8f0}
+.main{margin-left:240px;flex:1;padding:30px}
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.page-title{font-size:24px;font-weight:700}
+.btn{padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;transition:.2s}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-danger{background:#ef4444;color:#fff;padding:6px 12px;font-size:12px}
+.btn-success{background:#10b981;color:#fff;padding:6px 12px;font-size:12px}
+.filters{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.filter-select{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:13px}
+.table-wrap{background:#1e293b;border-radius:12px;border:1px solid #334155;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{background:#0f172a;padding:12px 16px;text-align:left;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+td{padding:12px 16px;border-bottom:1px solid #334155;font-size:13px}
+tr:last-child td{border:none}
+tr:hover td{background:#253347}
+.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-Pendente{background:#1e3a5f;color:#60a5fa}
+.badge-Comprado{background:#1a3a2a;color:#34d399}
+.badge-Recebido{background:#3b2a1a;color:#fb923c}
+.badge-Distribuido{background:#2a1a3b;color:#a78bfa}
+.empresa-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.modal-box{background:#1e293b;border-radius:16px;padding:28px;width:560px;max-height:90vh;overflow-y:auto;border:1px solid #334155}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12px;color:#64748b}
+input,select,textarea{background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:10px 12px;border-radius:8px;font-size:13px;width:100%}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">ControleTI</div>
+  <a href="/" class="nav-item">Dashboard</a>
+  <a href="/pedidos.html" class="nav-item active">Pedidos</a>
+  <a href="/equipamentos.html" class="nav-item">Equipamentos</a>
+  <a href="/cartoes.html" class="nav-item">Cartoes</a>
+  <a href="/notas-fiscais.html" class="nav-item">Notas Fiscais</a>
+  <a href="/colaboradores.html" class="nav-item">Colaboradores</a>
+  <a href="/empresas.html" class="nav-item">Empresas</a>
+</nav>
+<main class="main">
+  <div class="page-header">
+    <h1 class="page-title">Pedidos de Compra</h1>
+    <button class="btn btn-primary" onclick="abrirModal()">+ Novo Pedido</button>
+  </div>
+  <div class="filters">
+    <select class="filter-select" id="filtroEmpresa" onchange="filtrar()">
+      <option value="">Todas as Empresas</option>
+    </select>
+    <select class="filter-select" id="filtroStatus" onchange="filtrar()">
+      <option value="">Todos os Status</option>
+      <option>Pendente</option><option>Comprado</option><option>Recebido</option><option>Distribuido</option>
+    </select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Empresa</th><th>Qtd</th><th>Valor Unit.</th><th>Total</th><th>Forma Pgto</th><th>Status</th><th>Data</th><th>Acoes</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Novo Pedido</div>
+    <form id="form">
+      <input type="hidden" id="pedidoId">
+      <div class="form-grid">
+        <div class="form-group"><label>Item</label><input id="item" required></div>
+        <div class="form-group"><label>Empresa</label><select id="empresa_id" required><option value="">Selecione</option></select></div>
+        <div class="form-group"><label>Quantidade</label><input type="number" id="quantidade" value="1" min="1"></div>
+        <div class="form-group"><label>Valor Unitario (R$)</label><input type="number" id="valor_unitario" step="0.01"></div>
+        <div class="form-group"><label>Forma de Pagamento</label><select id="forma_pagamento"><option>Parcelado</option><option>A Vista</option></select></div>
+        <div class="form-group"><label>Parcelas</label><input type="number" id="num_parcelas" value="1" min="1"></div>
+        <div class="form-group"><label>Cartao</label><select id="cartao_id"><option value="">Sem cartao</option></select></div>
+        <div class="form-group"><label>Status</label><select id="status"><option>Pendente</option><option>Comprado</option><option>Recebido</option><option>Distribuido</option></select></div>
+        <div class="form-group"><label>Data da Compra</label><input type="date" id="data_compra"></div>
+        <div class="form-group full"><label>Observacoes</label><textarea id="observacoes" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" style="background:#334155;color:#e2e8f0" onclick="fecharModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+const fmt = v => 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+let todos = [], empresas = [], cartoes = [];
+async function load() {
+  [todos, empresas, cartoes] = await Promise.all([
+    fetch('/api/pedidos').then(r=>r.json()),
+    fetch('/api/empresas').then(r=>r.json()),
+    fetch('/api/cartoes').then(r=>r.json())
+  ]);
+  const sel = document.getElementById('filtroEmpresa');
+  empresas.forEach(e => sel.innerHTML += `<option value="${e.id}">${e.nome}</option>`);
+  const selE = document.getElementById('empresa_id');
+  empresas.forEach(e => selE.innerHTML += `<option value="${e.id}">${e.nome}</option>`);
+  const selC = document.getElementById('cartao_id');
+  cartoes.forEach(c => selC.innerHTML += `<option value="${c.id}">${c.banco} *${c.quatro_ultimos} (${c.empresa_nome})</option>`);
+  renderTabela(todos);
+}
+function renderTabela(data) {
+  document.getElementById('tbody').innerHTML = data.map(p => `
+    <tr>
+      <td>${p.item}</td>
+      <td><span class="empresa-badge" style="background:${p.empresa_cor}22;color:${p.empresa_cor}">${p.empresa_nome}</span></td>
+      <td>${p.quantidade}</td>
+      <td>${fmt(p.valor_unitario)}</td>
+      <td style="font-weight:600">${fmt(p.valor_total)}</td>
+      <td>${p.forma_pagamento}${p.num_parcelas>1?' ('+p.num_parcelas+'x)':''}</td>
+      <td><span class="badge badge-${p.status}">${p.status}</span></td>
+      <td>${p.data_compra ? new Date(p.data_compra).toLocaleDateString('pt-BR') : '-'}</td>
+      <td style="display:flex;gap:6px">
+        <select onchange="mudarStatus(${p.id},this.value)" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:4px;border-radius:6px;font-size:11px">
+          <option>Pendente</option><option>Comprado</option><option>Recebido</option><option>Distribuido</option>
+        </select>
+        <button class="btn btn-danger" onclick="deletar(${p.id})">X</button>
+      </td>
+    </tr>`).join('');
+}
+function filtrar() {
+  const e = document.getElementById('filtroEmpresa').value;
+  const s = document.getElementById('filtroStatus').value;
+  renderTabela(todos.filter(p => (!e||p.empresa_id==e) && (!s||p.status==s)));
+}
+async function mudarStatus(id, status) {
+  await fetch('/api/pedidos/'+id+'/status',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  load();
+}
+async function deletar(id) {
+  if(!confirm('Remover pedido?')) return;
+  await fetch('/api/pedidos/'+id,{method:'DELETE'});
+  load();
+}
+function abrirModal(p=null) {
+  document.getElementById('modal').classList.add('open');
+  if(p) { document.getElementById('pedidoId').value=p.id; document.getElementById('item').value=p.item; }
+  else { document.getElementById('form').reset(); document.getElementById('pedidoId').value=''; }
+}
+function fecharModal() { document.getElementById('modal').classList.remove('open'); }
+document.getElementById('form').onsubmit = async e => {
+  e.preventDefault();
+  const id = document.getElementById('pedidoId').value;
+  const data = {
+    item: document.getElementById('item').value,
+    empresa_id: document.getElementById('empresa_id').value,
+    quantidade: document.getElementById('quantidade').value,
+    valor_unitario: document.getElementById('valor_unitario').value,
+    forma_pagamento: document.getElementById('forma_pagamento').value,
+    num_parcelas: document.getElementById('num_parcelas').value,
+    cartao_id: document.getElementById('cartao_id').value || null,
+    status: document.getElementById('status').value,
+    data_compra: document.getElementById('data_compra').value || null,
+    observacoes: document.getElementById('observacoes').value
+  };
+  const url = id ? '/api/pedidos/'+id : '/api/pedidos';
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  fecharModal(); load();
+};
+load();
+</script>
+</body>
+</html>
