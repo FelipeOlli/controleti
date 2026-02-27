@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Empresas - Sistema de Controle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>CF Controle</h2>
+        </div>
+        <ul class="menu">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="pedidos.html">Pedidos</a></li>
+            <li><a href="cartoes.html">Cartões</a></li>
+            <li><a href="colaboradores.html">Colaboradores</a></li>
+            <li><a href="equipamentos.html">Equipamentos</a></li>
+            <li><a href="notas.html">Notas Fiscais</a></li>
+            <li><a href="empresas.html" class="active">Empresas</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>Gestão de Empresas</h1>
+            <button class="btn-primary" onclick="abrirModal()">+ Nova Empresa</button>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchEmpresa" placeholder="Buscar empresa..." onkeyup="buscarEmpresas()">
+        </div>
+
+        <div class="cards-grid" id="empresasLista">
+            <!-- Empresas serão carregadas aqui -->
+        </div>
+    </main>
+
+    <!-- Modal Novo/Editar Empresa -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo">Nova Empresa</h2>
+            <form id="form">
+                <input type="hidden" id="empresaId">
+                
+                <div class="form-group">
+                    <label for="nome">Nome *</label>
+                    <input type="text" id="nome" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="cnpj">CNPJ</label>
+                    <input type="text" id="cnpj" placeholder="00.000.000/0000-00">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let empresas = [];
+        let pedidos = [];
+        let colaboradores = [];
+        let equipamentos = [];
+
+        async function load() {
+            await carregarEmpresas();
+            await carregarEstatisticas();
+        }
+
+        async function carregarEmpresas() {
+            try {
+                const res = await fetch(`${API_URL}/empresas`);
+                empresas = await res.json();
+                renderizarEmpresas(empresas);
+            } catch(err) {
+                console.error('Erro ao carregar empresas:', err);
+                document.getElementById('empresasLista').innerHTML = '<p>Erro ao carregar empresas</p>';
+            }
+        }
+
+        async function carregarEstatisticas() {
+            try {
+                const [resPedidos, resColab, resEquip] = await Promise.all([
+                    fetch(`${API_URL}/pedidos`),
+                    fetch(`${API_URL}/colaboradores`),
+                    fetch(`${API_URL}/equipamentos`)
+                ]);
+                
+                pedidos = await resPedidos.json();
+                colaboradores = await resColab.json();
+                equipamentos = await resEquip.json();
+                
+                renderizarEmpresas(empresas);
+            } catch(err) {
+                console.error('Erro ao carregar estatísticas:', err);
+            }
+        }
+
+        function renderizarEmpresas(lista) {
+            const container = document.getElementById('empresasLista');
+            
+            if(lista.length === 0) {
+                container.innerHTML = '<p class="empty-message">Nenhuma empresa cadastrada</p>';
+                return;
+            }
+
+            container.innerHTML = lista.map(e => {
+                const pedidosEmpresa = pedidos.filter(p => p.empresa_id === e.id).length;
+                const colaboradoresEmpresa = colaboradores.filter(c => c.empresa_id === e.id).length;
+                const equipamentosEmpresa = equipamentos.filter(eq => eq.empresa_id === e.id).length;
+                
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>${e.nome}</h3>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>CNPJ:</strong> ${e.cnpj || 'Não informado'}</p>
+                            <hr>
+                            <div class="stats">
+                                <div class="stat-item">
+                                    <span class="stat-value">${pedidosEmpresa}</span>
+                                    <span class="stat-label">Pedidos</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">${colaboradoresEmpresa}</span>
+                                    <span class="stat-label">Colaboradores</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">${equipamentosEmpresa}</span>
+                                    <span class="stat-label">Equipamentos</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn-sm btn-secondary" onclick="editar(${e.id})">Editar</button>
+                            <button class="btn-sm btn-danger" onclick="deletar(${e.id})">Excluir</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function buscarEmpresas() {
+            const busca = document.getElementById('searchEmpresa').value.toLowerCase();
+            
+            if(!busca) {
+                renderizarEmpresas(empresas);
+                return;
+            }
+            
+            const filtradas = empresas.filter(e => 
+                (e.nome && e.nome.toLowerCase().includes(busca)) ||
+                (e.cnpj && e.cnpj.includes(busca))
+            );
+            
+            renderizarEmpresas(filtradas);
+        }
+
+        function abrirModal(empresa = null) {
+            document.getElementById('modalTitulo').textContent = empresa ? 'Editar Empresa' : 'Nova Empresa';
+            document.getElementById('modal').style.display = 'block';
+            
+            if(empresa) {
+                document.getElementById('empresaId').value = empresa.id;
+                document.getElementById('nome').value = empresa.nome || '';
+                document.getElementById('cnpj').value = empresa.cnpj || '';
+            } else {
+                document.getElementById('form').reset();
+                document.getElementById('empresaId').value = '';
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('form').reset();
+        }
+
+        async function editar(id) {
+            const empresa = empresas.find(e => e.id === id);
+            if(empresa) abrirModal(empresa);
+        }
+
+        async function deletar(id) {
+            const empresa = empresas.find(e => e.id === id);
+            const pedidosEmpresa = pedidos.filter(p => p.empresa_id === id).length;
+            const colaboradoresEmpresa = colaboradores.filter(c => c.empresa_id === id).length;
+            
+            if(pedidosEmpresa > 0 || colaboradoresEmpresa > 0) {
+                alert(`Não é possível excluir a empresa "${empresa.nome}" pois ela possui ${pedidosEmpresa} pedido(s) e ${colaboradoresEmpresa} colaborador(es) vinculados.`);
+                return;
+            }
+            
+            if(!confirm(`Remover empresa "${empresa.nome}"?`)) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/empresas/${id}`, {method: 'DELETE'});
+                if(res.ok) {
+                    await carregarEmpresas();
+                    await carregarEstatisticas();
+                } else {
+                    alert('Erro ao remover empresa');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao remover empresa');
+            }
+        }
+
+        document.getElementById('form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('empresaId').value;
+            const data = {
+                nome: document.getElementById('nome').value,
+                cnpj: document.getElementById('cnpj').value || null
+            };
+            
+            try {
+                const url = id ? `${API_URL}/empresas/${id}` : `${API_URL}/empresas`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if(res.ok) {
+                    fecharModal();
+                    await carregarEmpresas();
+                    await carregarEstatisticas();
+                } else {
+                    alert('Erro ao salvar empresa');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao salvar empresa');
+            }
+        };
+
+        // Formatar CNPJ automaticamente
+        document.getElementById('cnpj').addEventListener('input', function(e) {
+            let valor = e.target.value.replace(/\D/g, '');
+            if(valor.length <= 14) {
+                valor = valor.replace(/^(\d{2})(\d)/, '$1.$2');
+                valor = valor.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                valor = valor.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                valor = valor.replace(/(\d{4})(\d)/, '$1-$2');
+            }
+            e.target.value = valor;
+        });
+
+        load();
+    </script>
+</body>
+</html>
