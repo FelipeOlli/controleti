@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Colaboradores - Sistema de Controle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>CF Controle</h2>
+        </div>
+        <ul class="menu">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="pedidos.html">Pedidos</a></li>
+            <li><a href="cartoes.html">Cartões</a></li>
+            <li><a href="colaboradores.html" class="active">Colaboradores</a></li>
+            <li><a href="equipamentos.html">Equipamentos</a></li>
+            <li><a href="notas.html">Notas Fiscais</a></li>
+            <li><a href="empresas.html">Empresas</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>Gestão de Colaboradores</h1>
+            <button class="btn-primary" onclick="abrirModal()">+ Novo Colaborador</button>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchColab" placeholder="Buscar colaborador..." onkeyup="buscarColaboradores()">
+            <select id="filterEmpresa" onchange="buscarColaboradores()">
+                <option value="">Todas as Empresas</option>
+            </select>
+            <select id="filterSetor" onchange="buscarColaboradores()">
+                <option value="">Todos os Setores</option>
+                <option value="Fiscal">Fiscal</option>
+                <option value="Contábil">Contábil</option>
+                <option value="DP">DP</option>
+                <option value="Legalização">Legalização</option>
+                <option value="Curadoria">Curadoria</option>
+                <option value="TI">TI</option>
+                <option value="Administrativo">Administrativo</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table id="tabelaColaboradores">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Empresa</th>
+                        <th>Cargo</th>
+                        <th>Setor</th>
+                        <th>E-mail</th>
+                        <th>Data Entrada</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="colaboradoresLista">
+                    <!-- Colaboradores serão carregados aqui -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Novo/Editar Colaborador -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo">Novo Colaborador</h2>
+            <form id="form">
+                <input type="hidden" id="colaboradorId">
+                
+                <div class="form-group">
+                    <label for="empresa_id">Empresa *</label>
+                    <select id="empresa_id" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="nome">Nome *</label>
+                    <input type="text" id="nome" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="cargo">Cargo *</label>
+                    <select id="cargo" required>
+                        <option value="">Selecione...</option>
+                        <option value="Estágio">Estágio</option>
+                        <option value="Analista">Analista</option>
+                        <option value="Coordenador">Coordenador</option>
+                        <option value="Gerente">Gerente</option>
+                        <option value="Diretor">Diretor</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="setor">Setor *</label>
+                    <select id="setor" required>
+                        <option value="">Selecione...</option>
+                        <option value="Fiscal">Fiscal</option>
+                        <option value="Contábil">Contábil</option>
+                        <option value="DP">DP</option>
+                        <option value="Legalização">Legalização</option>
+                        <option value="Curadoria">Curadoria</option>
+                        <option value="TI">TI</option>
+                        <option value="Administrativo">Administrativo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email">
+                </div>
+
+                <div class="form-group">
+                    <label for="telefone">Telefone</label>
+                    <input type="tel" id="telefone" placeholder="(00) 00000-0000">
+                </div>
+
+                <div class="form-group">
+                    <label for="data_entrada">Data de Entrada *</label>
+                    <input type="date" id="data_entrada" required>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let colaboradores = [];
+        let empresas = [];
+
+        async function load() {
+            await carregarEmpresas();
+            await carregarColaboradores();
+        }
+
+        async function carregarEmpresas() {
+            try {
+                const res = await fetch(`${API_URL}/empresas`);
+                empresas = await res.json();
+                
+                const selectEmpresa = document.getElementById('empresa_id');
+                const filterEmpresa = document.getElementById('filterEmpresa');
+                
+                selectEmpresa.innerHTML = '<option value="">Selecione...</option>';
+                filterEmpresa.innerHTML = '<option value="">Todas as Empresas</option>';
+                
+                empresas.forEach(e => {
+                    selectEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                    filterEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar empresas:', err);
+            }
+        }
+
+        async function carregarColaboradores() {
+            try {
+                const res = await fetch(`${API_URL}/colaboradores`);
+                colaboradores = await res.json();
+                renderizarColaboradores(colaboradores);
+            } catch(err) {
+                console.error('Erro ao carregar colaboradores:', err);
+                document.getElementById('colaboradoresLista').innerHTML = '<tr><td colspan="7">Erro ao carregar colaboradores</td></tr>';
+            }
+        }
+
+        function renderizarColaboradores(lista) {
+            const tbody = document.getElementById('colaboradoresLista');
+            
+            if(lista.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-message">Nenhum colaborador cadastrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = lista.map(c => {
+                const empresa = empresas.find(e => e.id === c.empresa_id);
+                const dataEntrada = c.data_entrada ? new Date(c.data_entrada).toLocaleDateString('pt-BR') : 'N/A';
+                
+                return `
+                    <tr>
+                        <td>${c.nome}</td>
+                        <td>${empresa ? empresa.nome : 'N/A'}</td>
+                        <td>${c.cargo}</td>
+                        <td>${c.setor}</td>
+                        <td>${c.email || '-'}</td>
+                        <td>${dataEntrada}</td>
+                        <td>
+                            <button class="btn-sm btn-secondary" onclick="editar(${c.id})">Editar</button>
+                            <button class="btn-sm btn-danger" onclick="deletar(${c.id})">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function buscarColaboradores() {
+            const busca = document.getElementById('searchColab').value.toLowerCase();
+            const empresaId = document.getElementById('filterEmpresa').value;
+            const setor = document.getElementById('filterSetor').value;
+            
+            let filtrados = colaboradores;
+            
+            if(empresaId) {
+                filtrados = filtrados.filter(c => c.empresa_id == empresaId);
+            }
+            
+            if(setor) {
+                filtrados = filtrados.filter(c => c.setor === setor);
+            }
+            
+            if(busca) {
+                filtrados = filtrados.filter(c => 
+                    (c.nome && c.nome.toLowerCase().includes(busca)) ||
+                    (c.cargo && c.cargo.toLowerCase().includes(busca)) ||
+                    (c.email && c.email.toLowerCase().includes(busca))
+                );
+            }
+            
+            renderizarColaboradores(filtrados);
+        }
+
+        function abrirModal(colaborador = null) {
+            document.getElementById('modalTitulo').textContent = colaborador ? 'Editar Colaborador' : 'Novo Colaborador';
+            document.getElementById('modal').style.display = 'block';
+            
+            if(colaborador) {
+                document.getElementById('colaboradorId').value = colaborador.id;
+                document.getElementById('empresa_id').value = colaborador.empresa_id || '';
+                document.getElementById('nome').value = colaborador.nome || '';
+                document.getElementById('cargo').value = colaborador.cargo || '';
+                document.getElementById('setor').value = colaborador.setor || '';
+                document.getElementById('email').value = colaborador.email || '';
+                document.getElementById('telefone').value = colaborador.telefone || '';
+                document.getElementById('data_entrada').value = colaborador.data_entrada ? colaborador.data_entrada.split('T')[0] : '';
+            } else {
+                document.getElementById('form').reset();
+                document.getElementById('colaboradorId').value = '';
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('form').reset();
+        }
+
+        async function editar(id) {
+            const colaborador = colaboradores.find(c => c.id === id);
+            if(colaborador) abrirModal(colaborador);
+        }
+
+        async function deletar(id) {
+            if(!confirm('Remover colaborador?')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/colaboradores/${id}`, {method: 'DELETE'});
+                if(res.ok) {
+                    await carregarColaboradores();
+                } else {
+                    alert('Erro ao remover colaborador');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao remover colaborador');
+            }
+        }
+
+        document.getElementById('form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('colaboradorId').value;
+            const data = {
+                empresa_id: document.getElementById('empresa_id').value,
+                nome: document.getElementById('nome').value,
+                cargo: document.getElementById('cargo').value,
+                setor: document.getElementById('setor').value,
+                email: document.getElementById('email').value || null,
+                telefone: document.getElementById('telefone').value || null,
+                data_entrada: document.getElementById('data_entrada').value
+            };
+            
+            try {
+                const url = id ? `${API_URL}/colaboradores/${id}` : `${API_URL}/colaboradores`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if(res.ok) {
+                    fecharModal();
+                    await carregarColaboradores();
+                } else {
+                    alert('Erro ao salvar colaborador');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao salvar colaborador');
+            }
+        };
+
+        load();
+    </script>
+</body>
+</html>
