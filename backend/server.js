@@ -12,7 +12,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Servir frontend estatico
-app.use(express.static('/frontend'));
+app.use(express.static(path.join(__dirname, 'frontend')));
+
 // Rotas API
 app.use('/api/empresas', require('./routes/empresas'));
 app.use('/api/cartoes', require('./routes/cartoes'));
@@ -24,7 +25,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 
 // Rota fallback - serve o frontend
 app.get('*', (req, res) => {
-    res.sendFile('/frontend/index.html');});
+    res.sendFile(path.join(__dirname, 'frontend', 'index.html'));});
 
 // Handler de erros
 app.use((err, req, res, next) => {
