@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ControleTI - Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;display:flex;min-height:100vh}
+.sidebar{width:240px;background:#1e293b;padding:20px;display:flex;flex-direction:column;gap:8px;position:fixed;height:100vh;overflow-y:auto}
+.sidebar-logo{font-size:20px;font-weight:700;color:#3b82f6;padding:10px 0 20px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#94a3b8;text-decoration:none;font-size:14px;transition:.2s}
+.nav-item:hover,.nav-item.active{background:#334155;color:#e2e8f0}
+.nav-item .icon{width:18px;text-align:center}
+.main{margin-left:240px;flex:1;padding:30px}
+.page-title{font-size:24px;font-weight:700;margin-bottom:24px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:30px}
+.kpi-card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
+.kpi-label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.kpi-value{font-size:28px;font-weight:700;color:#e2e8f0}
+.kpi-sub{font-size:12px;color:#64748b;margin-top:4px}
+.section-title{font-size:16px;font-weight:600;margin-bottom:16px;color:#94a3b8}
+.empresa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:30px}
+.empresa-card{background:#1e293b;border-radius:12px;padding:20px;border:1px solid #334155}
+.empresa-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.empresa-dot{width:12px;height:12px;border-radius:50%}
+.empresa-nome{font-weight:600;font-size:16px}
+.empresa-total{font-size:22px;font-weight:700;margin-bottom:12px}
+.empresa-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #334155}
+.empresa-row:last-child{border:none}
+.pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:30px}
+.pipeline-col{background:#1e293b;border-radius:12px;padding:16px;border:1px solid #334155}
+.pipeline-header{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;justify-content:space-between}
+.pipeline-badge{background:#334155;padding:2px 8px;border-radius:20px;font-size:11px}
+.pipeline-card{background:#0f172a;border-radius:8px;padding:10px;margin-bottom:8px;border:1px solid #334155;font-size:12px}
+.pipeline-item{font-weight:600;margin-bottom:4px}
+.pipeline-empresa{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600}
+.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-pendente{background:#1e3a5f;color:#60a5fa}
+.badge-comprado{background:#1a3a2a;color:#34d399}
+.badge-recebido{background:#3b2a1a;color:#fb923c}
+.badge-distribuido{background:#2a1a3b;color:#a78bfa}
+.loading{color:#64748b;text-align:center;padding:40px}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-logo">ControleTI</div>
+  <a href="/" class="nav-item active"><span class="icon">&#9dashboard;</span> Dashboard</a>
+  <a href="/pedidos.html" class="nav-item"><span class="icon">&#128722;</span> Pedidos</a>
+  <a href="/equipamentos.html" class="nav-item"><span class="icon">&#128187;</span> Equipamentos</a>
+  <a href="/cartoes.html" class="nav-item"><span class="icon">&#128179;</span> Cartoes</a>
+  <a href="/notas-fiscais.html" class="nav-item"><span class="icon">&#128196;</span> Notas Fiscais</a>
+  <a href="/colaboradores.html" class="nav-item"><span class="icon">&#128100;</span> Colaboradores</a>
+  <a href="/empresas.html" class="nav-item"><span class="icon">&#127970;</span> Empresas</a>
+</nav>
+<main class="main">
+  <h1 class="page-title">Dashboard</h1>
+  <div class="kpi-grid" id="kpiGrid"><div class="loading">Carregando...</div></div>
+  <p class="section-title">Investimento por Empresa</p>
+  <div class="empresa-grid" id="empresaGrid"></div>
+  <p class="section-title">Pipeline de Status</p>
+  <div class="pipeline" id="pipeline"></div>
+</main>
+<script>
+const fmt = v => 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+async function load() {
+  const r = await fetch('/api/dashboard');
+  const d = await r.json();
+  const k = d.kpis;
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Orcamento Total</div><div class="kpi-value">${fmt(k.total_orcamento)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Comprado</div><div class="kpi-value">${fmt(k.total_comprado)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Itens Recebidos</div><div class="kpi-value">${k.itens_recebidos}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Aguard. Equip.</div><div class="kpi-value">${k.aguardando_equip}</div></div>
+  `;
+  document.getElementById('empresaGrid').innerHTML = d.por_empresa.map(e => `
+    <div class="empresa-card">
+      <div class="empresa-header"><div class="empresa-dot" style="background:${e.cor}"></div><div class="empresa-nome">${e.nome}</div></div>
+      <div class="empresa-total">${fmt(e.total)}</div>
+      <div class="empresa-row"><span>Parcelado</span><span>${fmt(e.parcelado)}</span></div>
+      <div class="empresa-row"><span>A Vista</span><span>${fmt(e.a_vista)}</span></div>
+      <div class="empresa-row"><span>Pedidos</span><span>${e.total_pedidos}</span></div>
+    </div>`).join('');
+  const cols = ['Pendente','Comprado','Recebido','Distribuido'];
+  const cores = {'Pendente':'badge-pendente','Comprado':'badge-comprado','Recebido':'badge-recebido','Distribuido':'badge-distribuido'};
+  document.getElementById('pipeline').innerHTML = cols.map(status => {
+    const items = d.pipeline.filter(p => p.status === status);
+    return `<div class="pipeline-col">
+      <div class="pipeline-header">${status}<span class="pipeline-badge">${items.length}</span></div>
+      ${items.map(p => `<div class="pipeline-card">
+        <div class="pipeline-item">${p.item} (${p.quantidade}x)</div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span class="pipeline-empresa" style="background:${p.cor}22;color:${p.cor}">${p.empresa_nome}</span>
+          <span>${fmt(p.valor_total)}</span>
+        </div></div>`).join('')}
+    </div>`;
+  }).join('');
+}
+load();
+</script>
+</body>
+</html>
