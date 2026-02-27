@@ -5,13 +5,14 @@ WORKDIR /app
 # Copiar package.json do backend
 COPY backend/package*.json ./
 
-# Instalar dependências
+# Instalar dependencias
 RUN npm install --production
 
-# Copiar código do backend
+# Copiar codigo do backend
 COPY backend/ ./
-# Copiar frontend para o nível acima (/frontend)
-COPY frontend/ /frontend/
+
+# Copiar frontend para /app/frontend
+COPY frontend/ ./frontend/
 
 EXPOSE 3000
 
