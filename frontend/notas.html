@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Notas Fiscais - Sistema de Controle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>CF Controle</h2>
+        </div>
+        <ul class="menu">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="pedidos.html">Pedidos</a></li>
+            <li><a href="cartoes.html">Cartões</a></li>
+            <li><a href="colaboradores.html">Colaboradores</a></li>
+            <li><a href="equipamentos.html">Equipamentos</a></li>
+            <li><a href="notas.html" class="active">Notas Fiscais</a></li>
+            <li><a href="empresas.html">Empresas</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>Gestão de Notas Fiscais</h1>
+            <button class="btn-primary" onclick="abrirModal()">+ Nova Nota Fiscal</button>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchNota" placeholder="Buscar por número/fornecedor..." onkeyup="buscarNotas()">
+            <select id="filterEmpresa" onchange="buscarNotas()">
+                <option value="">Todas as Empresas</option>
+            </select>
+            <select id="filterPedido" onchange="buscarNotas()">
+                <option value="">Todos os Pedidos</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table id="tabelaNotas">
+                <thead>
+                    <tr>
+                        <th>Número NF</th>
+                        <th>Empresa</th>
+                        <th>Pedido</th>
+                        <th>Fornecedor</th>
+                        <th>Valor</th>
+                        <th>Data Emissão</th>
+                        <th>Arquivo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="notasLista">
+                    <!-- Notas serão carregadas aqui -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Novo/Editar Nota -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo">Nova Nota Fiscal</h2>
+            <form id="form">
+                <input type="hidden" id="notaId">
+                
+                <div class="form-group">
+                    <label for="pedido_id">Pedido</label>
+                    <select id="pedido_id"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="numero_nf">Número da NF *</label>
+                    <input type="text" id="numero_nf" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="fornecedor">Fornecedor</label>
+                    <input type="text" id="fornecedor">
+                </div>
+
+                <div class="form-group">
+                    <label for="valor">Valor (R$)</label>
+                    <input type="number" id="valor" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="data_emissao">Data de Emissão</label>
+                    <input type="date" id="data_emissao">
+                </div>
+
+                <div class="form-group">
+                    <label for="arquivo_url">URL do Arquivo (MinIO)</label>
+                    <input type="text" id="arquivo_url" placeholder="Ex: nf-123456.pdf">
+                    <small>Informe apenas o nome do arquivo no bucket MinIO</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        const MINIO_URL = process.env.MINIO_PUBLIC_URL || 'http://localhost:9000/notas-fiscais';
+        let notas = [];
+        let empresas = [];
+        let pedidos = [];
+
+        async function load() {
+            await carregarEmpresas();
+            await carregarPedidos();
+            await carregarNotas();
+        }
+
+        async function carregarEmpresas() {
+            try {
+                const res = await fetch(`${API_URL}/empresas`);
+                empresas = await res.json();
+                
+                const filterEmpresa = document.getElementById('filterEmpresa');
+                filterEmpresa.innerHTML = '<option value="">Todas as Empresas</option>';
+                
+                empresas.forEach(e => {
+                    filterEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar empresas:', err);
+            }
+        }
+
+        async function carregarPedidos() {
+            try {
+                const res = await fetch(`${API_URL}/pedidos`);
+                pedidos = await res.json();
+                
+                const selectPedido = document.getElementById('pedido_id');
+                const filterPedido = document.getElementById('filterPedido');
+                
+                selectPedido.innerHTML = '<option value="">Sem vínculo</option>';
+                filterPedido.innerHTML = '<option value="">Todos os Pedidos</option>';
+                
+                pedidos.forEach(p => {
+                    const empresa = empresas.find(e => e.id === p.empresa_id);
+                    const label = `Pedido #${p.id} - ${p.item} (${empresa ? empresa.nome : 'N/A'})`;
+                    selectPedido.innerHTML += `<option value="${p.id}">${label}</option>`;
+                    filterPedido.innerHTML += `<option value="${p.id}">${label}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar pedidos:', err);
+            }
+        }
+
+        async function carregarNotas() {
+            try {
+                const res = await fetch(`${API_URL}/notas-fiscais`);
+                notas = await res.json();
+                renderizarNotas(notas);
+            } catch(err) {
+                console.error('Erro ao carregar notas:', err);
+                document.getElementById('notasLista').innerHTML = '<tr><td colspan="8">Erro ao carregar notas fiscais</td></tr>';
+            }
+        }
+
+        function renderizarNotas(lista) {
+            const tbody = document.getElementById('notasLista');
+            
+            if(lista.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-message">Nenhuma nota fiscal cadastrada</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = lista.map(n => {
+                const pedido = pedidos.find(p => p.id === n.pedido_id);
+                const empresa = pedido ? empresas.find(e => e.id === pedido.empresa_id) : null;
+                const dataEmissao = n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '-';
+                const valor = n.valor ? `R$ ${parseFloat(n.valor).toFixed(2)}` : '-';
+                
+                return `
+                    <tr>
+                        <td>${n.numero_nf}</td>
+                        <td>${empresa ? empresa.nome : '-'}</td>
+                        <td>${pedido ? `#${pedido.id} - ${pedido.item}` : '-'}</td>
+                        <td>${n.fornecedor || '-'}</td>
+                        <td>${valor}</td>
+                        <td>${dataEmissao}</td>
+                        <td>
+                            ${n.arquivo_url ? `<a href="${MINIO_URL}/${n.arquivo_url}" target="_blank" class="btn-sm btn-info">Ver Arquivo</a>` : '-'}
+                        </td>
+                        <td>
+                            <button class="btn-sm btn-secondary" onclick="editar(${n.id})">Editar</button>
+                            <button class="btn-sm btn-danger" onclick="deletar(${n.id})">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function buscarNotas() {
+            const busca = document.getElementById('searchNota').value.toLowerCase();
+            const empresaId = document.getElementById('filterEmpresa').value;
+            const pedidoId = document.getElementById('filterPedido').value;
+            
+            let filtrados = notas;
+            
+            if(pedidoId) {
+                filtrados = filtrados.filter(n => n.pedido_id == pedidoId);
+            } else if(empresaId) {
+                const pedidosDaEmpresa = pedidos.filter(p => p.empresa_id == empresaId).map(p => p.id);
+                filtrados = filtrados.filter(n => pedidosDaEmpresa.includes(n.pedido_id));
+            }
+            
+            if(busca) {
+                filtrados = filtrados.filter(n => 
+                    (n.numero_nf && n.numero_nf.toLowerCase().includes(busca)) ||
+                    (n.fornecedor && n.fornecedor.toLowerCase().includes(busca))
+                );
+            }
+            
+            renderizarNotas(filtrados);
+        }
+
+        function abrirModal(nota = null) {
+            document.getElementById('modalTitulo').textContent = nota ? 'Editar Nota Fiscal' : 'Nova Nota Fiscal';
+            document.getElementById('modal').style.display = 'block';
+            
+            if(nota) {
+                document.getElementById('notaId').value = nota.id;
+                document.getElementById('pedido_id').value = nota.pedido_id || '';
+                document.getElementById('numero_nf').value = nota.numero_nf || '';
+                document.getElementById('fornecedor').value = nota.fornecedor || '';
+                document.getElementById('valor').value = nota.valor || '';
+                document.getElementById('data_emissao').value = nota.data_emissao ? nota.data_emissao.split('T')[0] : '';
+                document.getElementById('arquivo_url').value = nota.arquivo_url || '';
+            } else {
+                document.getElementById('form').reset();
+                document.getElementById('notaId').value = '';
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('form').reset();
+        }
+
+        async function editar(id) {
+            const nota = notas.find(n => n.id === id);
+            if(nota) abrirModal(nota);
+        }
+
+        async function deletar(id) {
+            if(!confirm('Remover nota fiscal?')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/notas-fiscais/${id}`, {method: 'DELETE'});
+                if(res.ok) {
+                    await carregarNotas();
+                } else {
+                    alert('Erro ao remover nota fiscal');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao remover nota fiscal');
+            }
+        }
+
+        document.getElementById('form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('notaId').value;
+            const data = {
+                pedido_id: document.getElementById('pedido_id').value || null,
+                numero_nf: document.getElementById('numero_nf').value,
+                fornecedor: document.getElementById('fornecedor').value || null,
+                valor: document.getElementById('valor').value || null,
+                data_emissao: document.getElementById('data_emissao').value || null,
+                arquivo_url: document.getElementById('arquivo_url').value || null
+            };
+            
+            try {
+                const url = id ? `${API_URL}/notas-fiscais/${id}` : `${API_URL}/notas-fiscais`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if(res.ok) {
+                    fecharModal();
+                    await carregarNotas();
+                } else {
+                    alert('Erro ao salvar nota fiscal');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao salvar nota fiscal');
+            }
+        };
+
+        load();
+    </script>
+</body>
+</html>
