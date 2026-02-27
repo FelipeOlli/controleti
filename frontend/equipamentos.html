@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Equipamentos - Sistema de Controle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>CF Controle</h2>
+        </div>
+        <ul class="menu">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="pedidos.html">Pedidos</a></li>
+            <li><a href="cartoes.html">Cartões</a></li>
+            <li><a href="colaboradores.html">Colaboradores</a></li>
+            <li><a href="equipamentos.html" class="active">Equipamentos</a></li>
+            <li><a href="notas.html">Notas Fiscais</a></li>
+            <li><a href="empresas.html">Empresas</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>Gestão de Equipamentos</h1>
+            <button class="btn-primary" onclick="abrirModal()">+ Novo Equipamento</button>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchEquip" placeholder="Buscar equipamento..." onkeyup="buscarEquipamentos()">
+            <select id="filterEmpresa" onchange="buscarEquipamentos()">
+                <option value="">Todas as Empresas</option>
+            </select>
+            <select id="filterTipo" onchange="buscarEquipamentos()">
+                <option value="">Todos os Tipos</option>
+                <option value="Notebook">Notebook</option>
+                <option value="Monitor">Monitor</option>
+                <option value="Mouse">Mouse</option>
+                <option value="Teclado">Teclado</option>
+                <option value="Headset">Headset</option>
+                <option value="Webcam">Webcam</option>
+                <option value="Cadeira">Cadeira</option>
+                <option value="Outro">Outro</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table id="tabelaEquipamentos">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Marca/Modelo</th>
+                        <th>Empresa</th>
+                        <th>Colaborador</th>
+                        <th>Nº Série</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="equipamentosLista">
+                    <!-- Equipamentos serão carregados aqui -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Novo/Editar Equipamento -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo">Novo Equipamento</h2>
+            <form id="form">
+                <input type="hidden" id="equipamentoId">
+                
+                <div class="form-group">
+                    <label for="empresa_id">Empresa *</label>
+                    <select id="empresa_id" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tipo">Tipo *</label>
+                    <select id="tipo" required>
+                        <option value="">Selecione...</option>
+                        <option value="Notebook">Notebook</option>
+                        <option value="Monitor">Monitor</option>
+                        <option value="Mouse">Mouse</option>
+                        <option value="Teclado">Teclado</option>
+                        <option value="Headset">Headset</option>
+                        <option value="Webcam">Webcam</option>
+                        <option value="Cadeira">Cadeira</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="marca">Marca</label>
+                    <input type="text" id="marca">
+                </div>
+
+                <div class="form-group">
+                    <label for="modelo">Modelo</label>
+                    <input type="text" id="modelo">
+                </div>
+
+                <div class="form-group">
+                    <label for="numero_serie">Número de Série</label>
+                    <input type="text" id="numero_serie">
+                </div>
+
+                <div class="form-group">
+                    <label for="colaborador_id">Colaborador</label>
+                    <select id="colaborador_id">
+                        <option value="">Sem atribuição</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status *</label>
+                    <select id="status" required>
+                        <option value="Disponível">Disponível</option>
+                        <option value="Em uso">Em uso</option>
+                        <option value="Manutenção">Manutenção</option>
+                        <option value="Descartado">Descartado</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="data_aquisicao">Data de Aquisição</label>
+                    <input type="date" id="data_aquisicao">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let equipamentos = [];
+        let empresas = [];
+        let colaboradores = [];
+
+        async function load() {
+            await carregarEmpresas();
+            await carregarColaboradores();
+            await carregarEquipamentos();
+        }
+
+        async function carregarEmpresas() {
+            try {
+                const res = await fetch(`${API_URL}/empresas`);
+                empresas = await res.json();
+                
+                const selectEmpresa = document.getElementById('empresa_id');
+                const filterEmpresa = document.getElementById('filterEmpresa');
+                
+                selectEmpresa.innerHTML = '<option value="">Selecione...</option>';
+                filterEmpresa.innerHTML = '<option value="">Todas as Empresas</option>';
+                
+                empresas.forEach(e => {
+                    selectEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                    filterEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar empresas:', err);
+            }
+        }
+
+        async function carregarColaboradores() {
+            try {
+                const res = await fetch(`${API_URL}/colaboradores`);
+                colaboradores = await res.json();
+                
+                const selectColab = document.getElementById('colaborador_id');
+                selectColab.innerHTML = '<option value="">Sem atribuição</option>';
+                
+                colaboradores.forEach(c => {
+                    selectColab.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar colaboradores:', err);
+            }
+        }
+
+        async function carregarEquipamentos() {
+            try {
+                const res = await fetch(`${API_URL}/equipamentos`);
+                equipamentos = await res.json();
+                renderizarEquipamentos(equipamentos);
+            } catch(err) {
+                console.error('Erro ao carregar equipamentos:', err);
+                document.getElementById('equipamentosLista').innerHTML = '<tr><td colspan="7">Erro ao carregar equipamentos</td></tr>';
+            }
+        }
+
+        function renderizarEquipamentos(lista) {
+            const tbody = document.getElementById('equipamentosLista');
+            
+            if(lista.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-message">Nenhum equipamento cadastrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = lista.map(e => {
+                const empresa = empresas.find(emp => emp.id === e.empresa_id);
+                const colaborador = colaboradores.find(c => c.id === e.colaborador_id);
+                const marcaModelo = [e.marca, e.modelo].filter(Boolean).join(' ');
+                
+                let statusClass = '';
+                if(e.status === 'Em uso') statusClass = 'badge-success';
+                else if(e.status === 'Disponível') statusClass = 'badge-info';
+                else if(e.status === 'Manutenção') statusClass = 'badge-warning';
+                else statusClass = 'badge-danger';
+                
+                return `
+                    <tr>
+                        <td>${e.tipo}</td>
+                        <td>${marcaModelo || '-'}</td>
+                        <td>${empresa ? empresa.nome : 'N/A'}</td>
+                        <td>${colaborador ? colaborador.nome : '-'}</td>
+                        <td>${e.numero_serie || '-'}</td>
+                        <td><span class="badge ${statusClass}">${e.status}</span></td>
+                        <td>
+                            <button class="btn-sm btn-secondary" onclick="editar(${e.id})">Editar</button>
+                            <button class="btn-sm btn-danger" onclick="deletar(${e.id})">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function buscarEquipamentos() {
+            const busca = document.getElementById('searchEquip').value.toLowerCase();
+            const empresaId = document.getElementById('filterEmpresa').value;
+            const tipo = document.getElementById('filterTipo').value;
+            
+            let filtrados = equipamentos;
+            
+            if(empresaId) {
+                filtrados = filtrados.filter(e => e.empresa_id == empresaId);
+            }
+            
+            if(tipo) {
+                filtrados = filtrados.filter(e => e.tipo === tipo);
+            }
+            
+            if(busca) {
+                filtrados = filtrados.filter(e => 
+                    (e.tipo && e.tipo.toLowerCase().includes(busca)) ||
+                    (e.marca && e.marca.toLowerCase().includes(busca)) ||
+                    (e.modelo && e.modelo.toLowerCase().includes(busca)) ||
+                    (e.numero_serie && e.numero_serie.toLowerCase().includes(busca))
+                );
+            }
+            
+            renderizarEquipamentos(filtrados);
+        }
+
+        function abrirModal(equipamento = null) {
+            document.getElementById('modalTitulo').textContent = equipamento ? 'Editar Equipamento' : 'Novo Equipamento';
+            document.getElementById('modal').style.display = 'block';
+            
+            if(equipamento) {
+                document.getElementById('equipamentoId').value = equipamento.id;
+                document.getElementById('empresa_id').value = equipamento.empresa_id || '';
+                document.getElementById('tipo').value = equipamento.tipo || '';
+                document.getElementById('marca').value = equipamento.marca || '';
+                document.getElementById('modelo').value = equipamento.modelo || '';
+                document.getElementById('numero_serie').value = equipamento.numero_serie || '';
+                document.getElementById('colaborador_id').value = equipamento.colaborador_id || '';
+                document.getElementById('status').value = equipamento.status || 'Disponível';
+                document.getElementById('data_aquisicao').value = equipamento.data_aquisicao ? equipamento.data_aquisicao.split('T')[0] : '';
+            } else {
+                document.getElementById('form').reset();
+                document.getElementById('equipamentoId').value = '';
+                document.getElementById('status').value = 'Disponível';
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('form').reset();
+        }
+
+        async function editar(id) {
+            const equipamento = equipamentos.find(e => e.id === id);
+            if(equipamento) abrirModal(equipamento);
+        }
+
+        async function deletar(id) {
+            if(!confirm('Remover equipamento?')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/equipamentos/${id}`, {method: 'DELETE'});
+                if(res.ok) {
+                    await carregarEquipamentos();
+                } else {
+                    alert('Erro ao remover equipamento');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao remover equipamento');
+            }
+        }
+
+        document.getElementById('form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('equipamentoId').value;
+            const data = {
+                empresa_id: document.getElementById('empresa_id').value,
+                tipo: document.getElementById('tipo').value,
+                marca: document.getElementById('marca').value || null,
+                modelo: document.getElementById('modelo').value || null,
+                numero_serie: document.getElementById('numero_serie').value || null,
+                colaborador_id: document.getElementById('colaborador_id').value || null,
+                status: document.getElementById('status').value,
+                data_aquisicao: document.getElementById('data_aquisicao').value || null
+            };
+            
+            try {
+                const url = id ? `${API_URL}/equipamentos/${id}` : `${API_URL}/equipamentos`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if(res.ok) {
+                    fecharModal();
+                    await carregarEquipamentos();
+                } else {
+                    alert('Erro ao salvar equipamento');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao salvar equipamento');
+            }
+        };
+
+        load();
+    </script>
+</body>
+</html>
