@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Cartões - Sistema de Controle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>CF Controle</h2>
+        </div>
+        <ul class="menu">
+            <li><a href="index.html">Dashboard</a></li>
+            <li><a href="pedidos.html">Pedidos</a></li>
+            <li><a href="cartoes.html" class="active">Cartões</a></li>
+            <li><a href="colaboradores.html">Colaboradores</a></li>
+            <li><a href="equipamentos.html">Equipamentos</a></li>
+            <li><a href="notas.html">Notas Fiscais</a></li>
+            <li><a href="empresas.html">Empresas</a></li>
+        </ul>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>Gestão de Cartões</h1>
+            <button class="btn-primary" onclick="abrirModal()">+ Novo Cartão</button>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchCartao" placeholder="Buscar cartão..." onkeyup="buscarCartoes()">
+            <select id="filterEmpresa" onchange="buscarCartoes()">
+                <option value="">Todas as Empresas</option>
+            </select>
+        </div>
+
+        <div class="cards-grid" id="cartoesLista">
+            <!-- Cartões serão carregados aqui -->
+        </div>
+    </main>
+
+    <!-- Modal Novo/Editar Cartão -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <h2 id="modalTitulo">Novo Cartão</h2>
+            <form id="form">
+                <input type="hidden" id="cartaoId">
+                
+                <div class="form-group">
+                    <label for="empresa_id">Empresa *</label>
+                    <select id="empresa_id" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="numero">Número do Cartão *</label>
+                    <input type="text" id="numero" placeholder="**** **** **** ****" maxlength="19" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="bandeira">Bandeira *</label>
+                    <select id="bandeira" required>
+                        <option value="">Selecione...</option>
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="Elo">Elo</option>
+                        <option value="American Express">American Express</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="limite">Limite (R$)</label>
+                    <input type="number" id="limite" step="0.01" placeholder="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="vencimento">Dia Vencimento</label>
+                    <input type="number" id="vencimento" min="1" max="31" placeholder="Ex: 10">
+                </div>
+
+                <div class="form-group">
+                    <label for="titular">Titular</label>
+                    <input type="text" id="titular" placeholder="Nome do titular">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let cartoes = [];
+        let empresas = [];
+
+        async function load() {
+            await carregarEmpresas();
+            await carregarCartoes();
+        }
+
+        async function carregarEmpresas() {
+            try {
+                const res = await fetch(`${API_URL}/empresas`);
+                empresas = await res.json();
+                
+                const selectEmpresa = document.getElementById('empresa_id');
+                const filterEmpresa = document.getElementById('filterEmpresa');
+                
+                selectEmpresa.innerHTML = '<option value="">Selecione...</option>';
+                filterEmpresa.innerHTML = '<option value="">Todas as Empresas</option>';
+                
+                empresas.forEach(e => {
+                    selectEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                    filterEmpresa.innerHTML += `<option value="${e.id}">${e.nome}</option>`;
+                });
+            } catch(err) {
+                console.error('Erro ao carregar empresas:', err);
+            }
+        }
+
+        async function carregarCartoes() {
+            try {
+                const res = await fetch(`${API_URL}/cartoes`);
+                cartoes = await res.json();
+                renderizarCartoes(cartoes);
+            } catch(err) {
+                console.error('Erro ao carregar cartões:', err);
+                document.getElementById('cartoesLista').innerHTML = '<p>Erro ao carregar cartões</p>';
+            }
+        }
+
+        function renderizarCartoes(lista) {
+            const container = document.getElementById('cartoesLista');
+            
+            if(lista.length === 0) {
+                container.innerHTML = '<p class="empty-message">Nenhum cartão cadastrado</p>';
+                return;
+            }
+
+            container.innerHTML = lista.map(c => {
+                const empresa = empresas.find(e => e.id === c.empresa_id);
+                const numeroMascarado = c.numero ? `**** **** **** ${c.numero.slice(-4)}` : '****';
+                
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>${c.bandeira || 'Cartão'}</h3>
+                            <span class="badge badge-info">${empresa ? empresa.nome : 'N/A'}</span>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Número:</strong> ${numeroMascarado}</p>
+                            <p><strong>Titular:</strong> ${c.titular || 'Não informado'}</p>
+                            <p><strong>Limite:</strong> R$ ${parseFloat(c.limite || 0).toFixed(2)}</p>
+                            <p><strong>Vencimento:</strong> Dia ${c.vencimento || 'N/A'}</p>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn-sm btn-secondary" onclick="editar(${c.id})">Editar</button>
+                            <button class="btn-sm btn-danger" onclick="deletar(${c.id})">Excluir</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function buscarCartoes() {
+            const busca = document.getElementById('searchCartao').value.toLowerCase();
+            const empresaId = document.getElementById('filterEmpresa').value;
+            
+            let filtrados = cartoes;
+            
+            if(empresaId) {
+                filtrados = filtrados.filter(c => c.empresa_id == empresaId);
+            }
+            
+            if(busca) {
+                filtrados = filtrados.filter(c => 
+                    (c.numero && c.numero.includes(busca)) ||
+                    (c.bandeira && c.bandeira.toLowerCase().includes(busca)) ||
+                    (c.titular && c.titular.toLowerCase().includes(busca))
+                );
+            }
+            
+            renderizarCartoes(filtrados);
+        }
+
+        function abrirModal(cartao = null) {
+            document.getElementById('modalTitulo').textContent = cartao ? 'Editar Cartão' : 'Novo Cartão';
+            document.getElementById('modal').style.display = 'block';
+            
+            if(cartao) {
+                document.getElementById('cartaoId').value = cartao.id;
+                document.getElementById('empresa_id').value = cartao.empresa_id || '';
+                document.getElementById('numero').value = cartao.numero || '';
+                document.getElementById('bandeira').value = cartao.bandeira || '';
+                document.getElementById('limite').value = cartao.limite || '';
+                document.getElementById('vencimento').value = cartao.vencimento || '';
+                document.getElementById('titular').value = cartao.titular || '';
+            } else {
+                document.getElementById('form').reset();
+                document.getElementById('cartaoId').value = '';
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('form').reset();
+        }
+
+        async function editar(id) {
+            const cartao = cartoes.find(c => c.id === id);
+            if(cartao) abrirModal(cartao);
+        }
+
+        async function deletar(id) {
+            if(!confirm('Remover pedido?')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/cartoes/${id}`, {method: 'DELETE'});
+                if(res.ok) {
+                    await carregarCartoes();
+                } else {
+                    alert('Erro ao remover cartão');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao remover cartão');
+            }
+        }
+
+        document.getElementById('form').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('cartaoId').value;
+            const data = {
+                empresa_id: document.getElementById('empresa_id').value,
+                numero: document.getElementById('numero').value,
+                bandeira: document.getElementById('bandeira').value,
+                limite: document.getElementById('limite').value || null,
+                vencimento: document.getElementById('vencimento').value || null,
+                titular: document.getElementById('titular').value || null
+            };
+            
+            try {
+                const url = id ? `${API_URL}/cartoes/${id}` : `${API_URL}/cartoes`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if(res.ok) {
+                    fecharModal();
+                    await carregarCartoes();
+                } else {
+                    alert('Erro ao salvar cartão');
+                }
+            } catch(err) {
+                console.error('Erro:', err);
+                alert('Erro ao salvar cartão');
+            }
+        };
+
+        // Formatar número do cartão automaticamente
+        document.getElementById('numero').addEventListener('input', function(e) {
+            let valor = e.target.value.replace(/\s/g, '');
+            let formatado = valor.match(/.{1,4}/g);
+            e.target.value = formatado ? formatado.join(' ') : valor;
+        });
+
+        load();
+    </script>
+</body>
+</html>
